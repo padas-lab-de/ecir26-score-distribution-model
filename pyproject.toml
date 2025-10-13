@@ -1,0 +1,26 @@
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+name = "score-distribution-model"
+version = "1.0.0"
+description = "An experimentation suite for predicting Recall in large-scale retrieval using score distribution modeling."
+authors = ["Michael Dinzinger"]
+homepage = "https://www.fim.uni-passau.de"
+repository = "https://www.fim.uni-passau.de"
+readme = "README.md"
+license = "MIT"
+packages = [{ include = "sdm", from = "src" }]
+
+[tool.poetry.dependencies]
+python = ">=3.10,<3.12"
+click = "^8.1.7"
+torch = "^2.5.1"
+transformers = "^4.51.0"
+datasets = "^4.1.1"
+# black = "^25.1.0"
+# isort = "^6.0.1"
+
+[tool.poetry.scripts]
+sdm = "sdm.sdm:main"
