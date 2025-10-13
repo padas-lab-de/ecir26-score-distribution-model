@@ -1,8 +1,10 @@
+from typing import Tuple
+
 from .AbstractModelWrapper import AbstractModelWrapper
+
 # from .E5MultilingualWrapper import E5MultilingualWrapper
 # from .JinaV3Wrapper import JinaV3Wrapper
 from .SnowflakeWrapper import SnowflakeWrapper
-from typing import Tuple
 
 
 def get_model_wrapper(model_name: str) -> Tuple[AbstractModelWrapper, int]:

@@ -1,13 +1,9 @@
-# Modeling Score Distributions for Large-Scale Dense Information Retrieval
+# Predicting Recall@k for Large-Scale Dense Information Retrieval via Score Distribution Modeling
 
-[![Paper](https://img.shields.io/badge/Paper-ECIR%202026-blue)](link-to-paper)
+[![Paper](https://img.shields.io/badge/Paper-ECIR%202026-blue)](TODO)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-This repository contains the source code and experiments for the paper:
-
-> **Modeling Score Distributions for Large-Scale Dense Information Retrieval**
-> *Authors:* F. Author, S. Author, and T. Author
-> *To appear in:* European Conference on Information Retrieval (ECIR) 2025 — Short Paper Track
+This repository contains the source code and experiments for the paper **Modeling Score Distributions for Large-Scale Dense Information Retrieval**.
 
 ---
 
@@ -67,7 +63,7 @@ Experiments are conducted on the **CoRE benchmark**, which provides passage and 
 
 Clone the repository:
 
-```console
+```bash
 git clone https://github.com/padas-lab-de/ecir26-score-distribution-model.git
 cd ecir26-score-distribution-model
 ```
@@ -78,20 +74,20 @@ There are two ways you can install the dependencies to run the code.
 
 If you have the [Poetry](https://python-poetry.org/) package manager for Python installed already, you can simply set up everything with:
 
-```console
+```bash
 poetry install
 source $(poetry env info --path)/bin/activate
 ```
 
 After the installation of all dependencies, you will end up in a new shell with a loaded venv. In this shell, you can run the main `sdm` command. You can exit the shell at any time with `exit`.
 
-```console
+```bash
 sdm --help
 ```
 
 To install new dependencies in an existing poetry environment, you can run the following commands with the shell environment being activated:
 
-```console
+```bash
 poetry lock
 poetry install
 ```
@@ -100,7 +96,7 @@ poetry install
 
 You can also create a venv yourself and use `pip` to install dependencies:
 
-```console
+```bash
 python3 -m venv venv
 source venv/bin/activate
 pip install .
@@ -110,22 +106,29 @@ pip install .
 
 ## 🚀 Usage
 
-### 1️⃣ Fit Score Distributions
+### 1️⃣ Compute Score Distributions
+
+!The first time you run this command, it might take a while as it loads the entire CoRE dataset collection.
 
 ```bash
-python scripts/fit_distributions.py --input data/core_10k_scores.json --output results/distributions.pkl
+# Models: snowflakev2, snowflake, jina3, e5
+# Examples:
+sdm compute-score-distributions snowflakev2 passage
+sdm compute-score-distributions snowflakev2 document
 ```
 
-### 2️⃣ Predict Recall@k for Larger Corpora
+### 2️⃣ Visualize Score Distributions
 
 ```bash
-python scripts/predict_recall.py --distributions results/distributions.pkl --corpus_size 1e7 --k 100
+# Examples:
+sdm visualize line-chart snowflakev2 passage
+sdm visualize line-chart snowflakev2 document
 ```
 
-### 3️⃣ Reproduce ECIR 2025 Results
+### 3️⃣ Predict Recall@k for Larger Corpora
 
 ```bash
-python experiments/run_ecir_reproduction.py
+
 ```
 
 ---
@@ -161,7 +164,7 @@ Example output showing **empirical vs predicted Recall@k** curves for the CoRE p
 
 To run the code formatting, you can use the following command:
 
-```console
+```bash
 isort .
 black .
 ```
@@ -193,5 +196,3 @@ This project is licensed under the [MIT License](LICENSE).
 ## 🔗 Related Work
 
 * Reimers & Gurevych (2021): *The Curse of Dense Low-Dimensional Information Retrieval for Large Index Sizes*
-* Fröbe et al. (2025): *Corpus Subsampling: Estimating the Effectiveness of Neural Retrieval Models on Large Corpora*
-* Zhang et al. (2024): *pEBR: A Probabilistic Approach to Embedding-Based Retrieval*

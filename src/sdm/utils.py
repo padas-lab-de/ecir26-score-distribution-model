@@ -1,9 +1,9 @@
-import torch
 from collections import defaultdict
-from datasets import load_dataset
 from typing import Dict, Tuple
-import click
 
+import click
+import torch
+from datasets import load_dataset
 
 CoRE = {
     "passage": {
@@ -22,7 +22,6 @@ CoRE = {
         # "doc_10M": 10_000_000,
     },
 }
-
 
 
 def cos_sim(a, b):
@@ -51,9 +50,7 @@ def cos_sim(a, b):
 
 def load_data(
     dataset_sub_corpus: str,
-) -> Tuple[
-    defaultdict, Dict[str, str], Dict[str, Dict[str, str]]
-]:
+) -> Tuple[defaultdict, Dict[str, str], Dict[str, Dict[str, str]]]:
     """
     Loads the corpus, queries and qrels of the given CoRE dataset (passage or document) from the corresponding
     huggingface repo for all specified dataset sizes, i.e. 10k, 100k, 1M etc.
@@ -101,4 +98,3 @@ def load_data(
         )
 
     return corpora, queries, qrels
-

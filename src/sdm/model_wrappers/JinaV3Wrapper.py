@@ -1,6 +1,5 @@
 from typing import List, Union
 
-import torch
 from transformers import AutoModel
 
 from sdm.model_wrappers import AbstractModelWrapper

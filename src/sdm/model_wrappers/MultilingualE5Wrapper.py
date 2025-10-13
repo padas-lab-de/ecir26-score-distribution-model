@@ -1,10 +1,11 @@
+from typing import Dict, List
+
 import numpy as np
+import torch
 import torch.nn.functional as F
 from tqdm import tqdm
 from transformers import AutoModel, AutoTokenizer
 from transformers.modeling_outputs import BaseModelOutput
-import torch
-from typing import List, Dict
 
 from sdm.model_wrappers import AbstractModelWrapper
 from sdm.model_wrappers.utils import *

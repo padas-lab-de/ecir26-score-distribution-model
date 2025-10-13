@@ -8,9 +8,8 @@ import torch
 from tqdm import tqdm
 
 from sdm.config import *
-from sdm.utils import load_data
 from sdm.model_wrappers import AbstractModelWrapper, get_model_wrapper
-from sdm.utils import cos_sim
+from sdm.utils import cos_sim, load_data
 
 CORPUS_CHUNK_SIZE = 50_000
 DATASETS = {
@@ -44,7 +43,7 @@ def _load_embeddings(save_path: str) -> Optional[torch.Tensor]:
     """
     if save_path:
         try:
-            embeddings = torch.tensor(torch.load(save_path, weights_only=False))
+            embeddings = torch.load(save_path, weights_only=False)
             return embeddings
         except OSError:
             click.echo(f"Could not find any embeddings at {save_path}")
@@ -63,17 +62,15 @@ def _encode_queries(
     Args:
         save_path: The path where the embeddings are stored.
         queries: The queries to encode.
-        encode_kwargs: The keyword arguments passed to the encoding function.
         model: The model used to encode the queries.
+        encode_kwargs: The keyword arguments passed to the encoding function.
 
     Returns:
         The generated query embeddings.
     """
-    query_embeddings = torch.tensor(
-        model.encode_queries(
-            queries,
-            **encode_kwargs,
-        )
+    query_embeddings = model.encode_queries(
+        queries,
+        **encode_kwargs,
     )
 
     if save_path:
@@ -95,14 +92,12 @@ def _encode_corpus(
     Args:
         save_path: The path where the embeddings are stored.
         corpus: The documents to encode.
-        encode_kwargs: The keyword arguments passed to the encoding function.
         model: The model used to encode the queries.
+        encode_kwargs: The keyword arguments passed to the encoding function.
     """
-    sub_corpus_embeddings = torch.tensor(
-        model.encode_corpus(
-            corpus,
-            **encode_kwargs,
-        )
+    sub_corpus_embeddings = model.encode_corpus(
+        corpus,
+        **encode_kwargs,
     )
 
     if save_path:
@@ -117,8 +112,10 @@ def _encode_corpus(
 
 @click.command()
 @click.argument("model_name", type=str)
-@click.argument("document_length", type=click.Choice(["passage", "document"]), default="passage")
-def evaluate(model_name: str, document_length: str):
+@click.argument(
+    "document_length", type=click.Choice(["passage", "document"]), default="passage"
+)
+def compute_score_distributions(model_name: str, document_length: str):
     """
     Run the evaluation for the given model.
     """
@@ -171,16 +168,10 @@ def evaluate(model_name: str, document_length: str):
 
     # Initialize cos_sim dicts
     relevant_cos_sim_scores = {}
-    distractor_cos_sim_scores = {}
     nonrelevant_cos_sim_scores = {}
-    base_ranks = {}
-    relevant_ranks = {}
     for dimensionality in dimensionalities:
         relevant_cos_sim_scores[dimensionality] = defaultdict(dict)
-        distractor_cos_sim_scores[dimensionality] = defaultdict(list)
         nonrelevant_cos_sim_scores[dimensionality] = defaultdict(list)
-        base_ranks[dimensionality] = defaultdict(dict)
-        relevant_ranks[dimensionality] = defaultdict(dict)
 
     # Loop over corpora
     for corpus_size in corpus_sizes:
@@ -233,11 +224,7 @@ def evaluate(model_name: str, document_length: str):
                             relevant_cos_sim_scores[dimensionality][qid][docid] = (
                                 cos_sim_scores[batch_index].item()
                             )
-                        elif docid in distractor_corpus_ids[qid]:
-                            distractor_cos_sim_scores[dimensionality][qid].append(
-                                cos_sim_scores[batch_index].item()
-                            )
-                        else:
+                        elif docid not in distractor_corpus_ids[qid]:
                             nonrelevant_cos_sim_scores[dimensionality][qid].append(
                                 cos_sim_scores[batch_index].item()
                             )
@@ -245,59 +232,19 @@ def evaluate(model_name: str, document_length: str):
         # Clear CUDA cache
         torch.cuda.empty_cache()
 
-        click.echo("Computing ranks")
-        for dimensionality in tqdm(dimensionalities):
-
-            for qid in query_ids:
-                # Sort distractor cosine similarity scores
-                _distractor_cos_sim_scores = sorted(
-                    distractor_cos_sim_scores[dimensionality][qid], reverse=True
-                )
-
-                # Sort nonrelevant cosine similarity scores
-                _nonrelevant_cos_sim_scores = sorted(
-                    nonrelevant_cos_sim_scores[dimensionality][qid], reverse=True
-                )
-
-                for i, (docid, cos_sim_score) in enumerate(
-                    sorted(
-                        relevant_cos_sim_scores[dimensionality][qid].items(),
-                        key=lambda x: x[1],
-                        reverse=True,
-                    )
-                ):
-                    rank = i + 1
-                    for distractor_cos_sim_score in _distractor_cos_sim_scores:
-                        if cos_sim_score >= distractor_cos_sim_score:
-                            break
-                        else:
-                            rank += 1
-
-                    base_ranks[dimensionality][qid][docid] = rank
-
-                    for nonrelevant_cos_sim_score in _nonrelevant_cos_sim_scores:
-                        if cos_sim_score >= nonrelevant_cos_sim_score:
-                            break
-                        else:
-                            rank += 1
-
-                    relevant_ranks[dimensionality][qid][docid] = rank
-
         # Save results
         pickle_save_path = os.path.join(
             RESULTS_FOLDER,
             model_name,
             document_length,
             str(corpus_size),
-            "results.pkl",
+            "cos_sim_scores.pkl",
         )
         os.makedirs(os.path.dirname(pickle_save_path), exist_ok=True)
         results = {
-            "relevant_ranks": relevant_ranks,
+            "relevant_cos_sim_scores": relevant_cos_sim_scores,
+            "nonrelevant_cos_sim_scores": nonrelevant_cos_sim_scores,
         }
-        results["relevant_cos_sim_scores"] = relevant_cos_sim_scores
-        results["distractor_cos_sim_scores"] = distractor_cos_sim_scores
-        results["nonrelevant_cos_sim_scores"] = nonrelevant_cos_sim_scores
         click.echo(f"Saving results to {pickle_save_path}")
         with open(pickle_save_path, "wb") as f:
             pickle.dump(results, f)

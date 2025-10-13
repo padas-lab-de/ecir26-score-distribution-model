@@ -17,10 +17,12 @@ packages = [{ include = "sdm", from = "src" }]
 python = ">=3.10,<3.12"
 click = "^8.1.7"
 torch = "^2.5.1"
-transformers = "^4.51.0"
 datasets = "^4.1.1"
-# black = "^25.1.0"
-# isort = "^6.0.1"
+scipy = "^1.15.3"
+black = "^25.1.0"
+isort = "^6.0.1"
+xformers = "^0.0.30"
+matplotlib = "^3.10.7"
 
 [tool.poetry.scripts]
 sdm = "sdm.sdm:main"

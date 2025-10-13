@@ -1,5 +1,7 @@
 import click
-from sdm.cli.evaluate import evaluate
+
+from sdm.cli.compute_score_distributions import compute_score_distributions
+from sdm.cli.visualize.line_chart import line_chart
 
 
 @click.group()
@@ -20,7 +22,10 @@ def visualize():
     pass
 
 
-main.add_command(evaluate)
+main.add_command(compute_score_distributions)
+
+main.add_command(visualize)
+visualize.add_command(line_chart)
 
 
 if __name__ == "__main__":
