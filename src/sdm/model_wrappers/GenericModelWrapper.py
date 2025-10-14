@@ -12,26 +12,23 @@ from sdm.model_wrappers import AbstractModelWrapper
 from sdm.model_wrappers.utils import *
 
 
-class SnowflakeWrapper(AbstractModelWrapper):
+class GenericModelWrapper(AbstractModelWrapper):
 
     def __init__(
         self,
-        pretrained_model_name="Snowflake/snowflake-arctic-embed-m-v2.0",
+        pretrained_model_name: str,
         batch_size: int = 64,
         pool_type: str = "cls",
+        query_instruct: str = "",
     ):
         super().__init__()
         self.pretrained_model_name = pretrained_model_name
         self.pool_type = pool_type
         self.batch_size = batch_size
+        self.query_instruct = query_instruct
 
         self.encoder = None
         self.tokenizer = None
-
-        if pretrained_model_name.endswith("v2.0"):
-            self.prefix = "query: "
-        else:
-            self.prefix = "Represent this sentence for searching "
 
     def _lazy_loading(self):
         self.encoder = AutoModel.from_pretrained(
@@ -42,22 +39,24 @@ class SnowflakeWrapper(AbstractModelWrapper):
         self.encoder.cuda()
         self.encoder.eval()
 
-    def encode_queries(self, queries: List[str], **kwargs) -> torch.Tensor:
+    def encode_queries(self, queries: List[str], *args, **kwargs) -> torch.Tensor:
         if self.encoder is None or self.tokenizer is None:
             self._lazy_loading()
 
-        input_texts = ["{}{}".format(self.prefix, q) for q in queries]
+        input_texts = ["{}{}".format(self.query_instruct, q) for q in queries]
         return self._do_encode(input_texts)
 
-    def encode_corpus(self, corpus: List[Dict[str, str]], **kwargs) -> torch.Tensor:
-        if self.encoder is None or self.tokenizer is None:
-            self._lazy_loading()
-
+    def encode_corpus(
+        self, corpus: List[Dict[str, str]], *args, **kwargs
+    ) -> torch.Tensor:
         input_texts = [construct_document(doc) for doc in corpus]
         return self._do_encode(input_texts)
 
     @torch.no_grad()
     def _do_encode(self, input_texts: List[str]) -> torch.Tensor:
+        if self.encoder is None or self.tokenizer is None:
+            self._lazy_loading()
+
         dataset: Dataset = Dataset.from_dict({"contents": input_texts})
         dataset.set_transform(partial(transform_func, self.tokenizer))
 
@@ -73,7 +72,7 @@ class SnowflakeWrapper(AbstractModelWrapper):
         )
 
         encoded_embeds = []
-        for batch_dict in tqdm(data_loader, desc="encoding", mininterval=10):
+        for batch_dict in tqdm(data_loader, desc="Encoding", mininterval=10):
             batch_dict = move_to_cuda(batch_dict)
 
             with torch.amp.autocast("cuda"):

@@ -22,7 +22,9 @@ scipy = "^1.15.3"
 black = "^25.1.0"
 isort = "^6.0.1"
 xformers = "^0.0.30"
+einops = "^0.8.1"
 matplotlib = "^3.10.7"
+pytrec-eval-terrier = "^0.5.9"
 
 [tool.poetry.scripts]
 sdm = "sdm.sdm:main"

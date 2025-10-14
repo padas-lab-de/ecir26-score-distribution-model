@@ -8,25 +8,8 @@ import torch
 from tqdm import tqdm
 
 from sdm.config import *
-from sdm.model_wrappers import AbstractModelWrapper, get_model_wrapper
+from sdm.model_wrappers import MODEL_WRAPPERS, AbstractModelWrapper, get_model_wrapper
 from sdm.utils import cos_sim, load_data
-
-CORPUS_CHUNK_SIZE = 50_000
-DATASETS = {
-    "passage": [
-        10_000,
-        # 100_000,
-        # 1_000_000,
-        # 10_000_000,
-        # 100_000_000,
-    ],
-    "document": [
-        10_000,
-        # 100_000,
-        # 1_000_000,
-        # 10_000_000,
-    ],
-}
 
 
 def _load_embeddings(save_path: str) -> Optional[torch.Tensor]:
@@ -111,14 +94,41 @@ def _encode_corpus(
 
 
 @click.command()
-@click.argument("model_name", type=str)
 @click.argument(
-    "document_length", type=click.Choice(["passage", "document"]), default="passage"
+    "model_name",
+    type=click.Choice(["all"] + list(MODEL_WRAPPERS.keys())),
+    default="all",
+)
+@click.argument(
+    "document_length",
+    type=click.Choice(["both", "passage", "document"]),
+    default="both",
 )
 def compute_score_distributions(model_name: str, document_length: str):
     """
-    Run the evaluation for the given model.
+    Wrapper function to compute score distributions for the given model and document length.
     """
+    model_names = list(MODEL_WRAPPERS.keys()) if model_name == "all" else [model_name]
+    document_lengths = (
+        ["passage", "document"] if document_length == "both" else [document_length]
+    )
+    for model_name in model_names:
+        for document_length in document_lengths:
+            try:
+                _compute_score_distributions(model_name, document_length)
+            except Exception as e:
+                click.echo(
+                    f"Error computing score distributions for {model_name}, {document_length}: {e}"
+                )
+
+    click.echo("Done")
+
+
+def _compute_score_distributions(model_name: str, document_length: str):
+    """
+    Compute score distributions for the given model and document length.
+    """
+    click.echo("Computing score distributions")
     click.echo(f"Model: {model_name}")
     click.echo(f"Document Length: {document_length}")
 
@@ -133,7 +143,6 @@ def compute_score_distributions(model_name: str, document_length: str):
     click.echo(f"Loaded {len(queries)} queries and {len(corpora)} corpora")
 
     # Initialize results dict
-    corpus_sizes = sorted(corpora.keys())
     dimensionalities = [
         d for d in sorted(DIMENSIONALITIES, reverse=True) if d <= max_dim
     ]
@@ -173,80 +182,74 @@ def compute_score_distributions(model_name: str, document_length: str):
         relevant_cos_sim_scores[dimensionality] = defaultdict(dict)
         nonrelevant_cos_sim_scores[dimensionality] = defaultdict(list)
 
-    # Loop over corpora
-    for corpus_size in corpus_sizes:
-        click.echo(f"Evaluating corpus of size {corpus_size}...")
+    # Compute scores for smallest corpus size: 10,000
+    click.echo("Evaluating corpus of size 10,000")
+    corpus_size = 10_000
 
-        # Embed corpus
-        corpus = corpora[corpus_size]
-        corpus_ids = list(corpus.keys())
-        corpus_ids = sorted(corpus_ids)
-        corpus = [corpus[cid] for cid in corpus_ids]
+    # Embed corpus
+    corpus = corpora[corpus_size]
+    corpus_ids = list(corpus.keys())
+    corpus_ids = sorted(corpus_ids)
+    corpus = [corpus[cid] for cid in corpus_ids]
 
-        # Iterator over batches
-        iterator = range(0, len(corpus), CORPUS_CHUNK_SIZE)
+    # Iterator over batches
+    iterator = range(0, len(corpus), CORPUS_CHUNK_SIZE)
 
-        # Encoding corpus in batches... Warning: This might take a while!
-        for batch_num, corpus_start_idx in enumerate(iterator):
-            batch_save_path = os.path.join(
-                save_path, str(corpus_size), f"corpus_batch_{batch_num}.pt"
-            )
-            corpus_end_idx = min(corpus_start_idx + CORPUS_CHUNK_SIZE, len(corpus))
-
-            sub_corpus_embeddings = _load_embeddings(batch_save_path)
-
-            if sub_corpus_embeddings is not None:
-                click.echo(
-                    f"Loaded corpus embeddings for batch {batch_num + 1}/{len(iterator)} at {batch_save_path}"
-                )
-            else:
-                click.echo(f"Encoding Batch {batch_num + 1}/{len(iterator)}...")
-
-                # Encode chunk of corpus
-                sub_corpus_embeddings = _encode_corpus(
-                    batch_save_path,
-                    corpus[corpus_start_idx:corpus_end_idx],
-                    model,
-                )
-
-            click.echo("Computing cosine similarity scores")
-            batch_corpus_ids = corpus_ids[corpus_start_idx:corpus_end_idx]
-            for qid in tqdm(query_ids):
-                for dimensionality in dimensionalities:
-                    query_embedding = query_id_embeddings[qid][:dimensionality]
-                    doc_embeddings = sub_corpus_embeddings[:, :dimensionality]
-
-                    # Compute cosine similarity
-                    cos_sim_scores = cos_sim(query_embedding, doc_embeddings)[0]
-
-                    for batch_index, docid in enumerate(batch_corpus_ids):
-                        if docid in relevant_corpus_ids[qid]:
-                            relevant_cos_sim_scores[dimensionality][qid][docid] = (
-                                cos_sim_scores[batch_index].item()
-                            )
-                        elif docid not in distractor_corpus_ids[qid]:
-                            nonrelevant_cos_sim_scores[dimensionality][qid].append(
-                                cos_sim_scores[batch_index].item()
-                            )
-
-        # Clear CUDA cache
-        torch.cuda.empty_cache()
-
-        # Save results
-        pickle_save_path = os.path.join(
-            RESULTS_FOLDER,
-            model_name,
-            document_length,
-            str(corpus_size),
-            "cos_sim_scores.pkl",
+    # Encoding corpus in batches... Warning: This might take a while!
+    for batch_num, corpus_start_idx in enumerate(iterator):
+        batch_save_path = os.path.join(
+            save_path, str(corpus_size), f"corpus_batch_{batch_num}.pt"
         )
-        os.makedirs(os.path.dirname(pickle_save_path), exist_ok=True)
-        results = {
-            "relevant_cos_sim_scores": relevant_cos_sim_scores,
-            "nonrelevant_cos_sim_scores": nonrelevant_cos_sim_scores,
-        }
-        click.echo(f"Saving results to {pickle_save_path}")
-        with open(pickle_save_path, "wb") as f:
-            pickle.dump(results, f)
+        corpus_end_idx = min(corpus_start_idx + CORPUS_CHUNK_SIZE, len(corpus))
 
-    click.echo("Done")
+        sub_corpus_embeddings = _load_embeddings(batch_save_path)
+
+        if sub_corpus_embeddings is not None:
+            click.echo(
+                f"Loaded corpus embeddings for batch {batch_num + 1}/{len(iterator)} at {batch_save_path}"
+            )
+        else:
+            click.echo(f"Encoding Batch {batch_num + 1}/{len(iterator)}...")
+
+            # Encode chunk of corpus
+            sub_corpus_embeddings = _encode_corpus(
+                batch_save_path,
+                corpus[corpus_start_idx:corpus_end_idx],
+                model,
+            )
+
+        click.echo("Computing cosine similarity scores")
+        batch_corpus_ids = corpus_ids[corpus_start_idx:corpus_end_idx]
+        for qid in tqdm(query_ids):
+            for dimensionality in dimensionalities:
+                query_embedding = query_id_embeddings[qid][:dimensionality]
+                doc_embeddings = sub_corpus_embeddings[:, :dimensionality]
+
+                # Compute cosine similarity
+                cos_sim_scores = cos_sim(query_embedding, doc_embeddings)[0]
+
+                for batch_index, docid in enumerate(batch_corpus_ids):
+                    if docid in relevant_corpus_ids[qid]:
+                        relevant_cos_sim_scores[dimensionality][qid][docid] = (
+                            cos_sim_scores[batch_index].item()
+                        )
+                    elif docid not in distractor_corpus_ids[qid]:
+                        nonrelevant_cos_sim_scores[dimensionality][qid].append(
+                            cos_sim_scores[batch_index].item()
+                        )
+
+    # Clear CUDA cache
+    torch.cuda.empty_cache()
+
+    # Save results
+    pickle_save_path = os.path.join(
+        RESOURCES_FOLDER, "cos_sim_scores", model_name, f"{document_length}.pkl"
+    )
+    os.makedirs(os.path.dirname(pickle_save_path), exist_ok=True)
+    results = {
+        "relevant_cos_sim_scores": relevant_cos_sim_scores,
+        "nonrelevant_cos_sim_scores": nonrelevant_cos_sim_scores,
+    }
+    click.echo(f"Saving results to {pickle_save_path}")
+    with open(pickle_save_path, "wb") as f:
+        pickle.dump(results, f)

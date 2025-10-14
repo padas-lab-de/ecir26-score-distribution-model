@@ -3,15 +3,7 @@ from typing import List, Union
 from transformers import AutoModel
 
 from sdm.model_wrappers import AbstractModelWrapper
-
-
-def _construct_document(doc):
-    if isinstance(doc, str):
-        return doc
-    elif "title" in doc:
-        return f"{doc['title']} {doc['text'].strip()}"
-    else:
-        return doc["text"].strip()
+from sdm.model_wrappers.utils import construct_document
 
 
 class JinaV3Wrapper(AbstractModelWrapper):
@@ -29,6 +21,14 @@ class JinaV3Wrapper(AbstractModelWrapper):
         )
         self.encoder.cuda()
         self.encoder.eval()
+
+    def get_instructions(self):
+        if self.encoder is None:
+            self._lazy_loading()
+        return [
+            self.encoder._task_instructions[x]
+            for x in ["retrieval.query", "retrieval.passage"]
+        ]
 
     def encode_queries(
         self,
@@ -48,15 +48,7 @@ class JinaV3Wrapper(AbstractModelWrapper):
     ):
         if self.encoder is None:
             self._lazy_loading()
-        _sentences = [_construct_document(sentence) for sentence in sentences]
+        _sentences = [construct_document(sentence) for sentence in sentences]
         return self.encoder.encode(
             _sentences, *args, task="retrieval.passage", **kwargs
         )
-
-    def get_instructions(self):
-        if self.encoder is None:
-            self._lazy_loading()
-        return [
-            self.encoder._task_instructions[x]
-            for x in ["retrieval.query", "retrieval.passage"]
-        ]

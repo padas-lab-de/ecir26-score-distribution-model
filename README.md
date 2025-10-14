@@ -108,27 +108,29 @@ pip install .
 
 ### 1️⃣ Compute Score Distributions
 
-!The first time you run this command, it might take a while as it loads the entire CoRE dataset collection.
+> [!NOTE]
+> The first time you run this command, it might take a while as it loads the entire CoRE dataset collection.
 
 ```bash
 # Models: snowflakev2, snowflake, jina3, e5
 # Examples:
 sdm compute-score-distributions snowflakev2 passage
-sdm compute-score-distributions snowflakev2 document
+
+# To run for all models and both passage/document collections:
+sdm compute-score-distributions
 ```
 
 ### 2️⃣ Visualize Score Distributions
 
 ```bash
-# Examples:
-sdm visualize line-chart snowflakev2 passage
-sdm visualize line-chart snowflakev2 document
+sdm visualize distribution
 ```
 
 ### 3️⃣ Predict Recall@k for Larger Corpora
 
 ```bash
-
+sdm compute-empirical-results
+sdm visualize prediction
 ```
 
 ---
@@ -137,11 +139,13 @@ sdm visualize line-chart snowflakev2 document
 
 ```
 .
-├── embeddings/                # Precomputed embeddings for CoRE datasets
-├── src/
-│   ├── models/                # Score Distribution Model implementations
-│   └── utils/                 # Helper functions (e.g. fitting, plotting)
-├── results/                   # Output figures and tables (Recall@k curves)
+├── src/sdm/cli/
+│   ├── compute-score-distributions.py
+│   ├── compute-empirical-results.py
+│   └── visualize/
+│       ├── distribution.py
+│       └── prediction.py
+├── resources/                 # Output figures (e.g. Recall@k curves)
 ├── README.md
 └── LICENSE
 ```
@@ -153,7 +157,7 @@ sdm visualize line-chart snowflakev2 document
 Example output showing **empirical vs predicted Recall@k** curves for the CoRE passage collection:
 
 <p align="center">
-  <img src="figures/recall_curves.png" width="500">
+  <img src="images/recall.png" width="500">
 </p>
 
 ---

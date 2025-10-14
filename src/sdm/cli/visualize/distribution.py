@@ -10,7 +10,8 @@ import scipy.stats as st
 from scipy.optimize import minimize_scalar
 
 from sdm.config import *
-from sdm.model_wrappers import get_model_wrapper
+from sdm.model_wrappers import MODEL_WRAPPERS
+from sdm.utils import alpha_skewnorm, compute_recall_at_k
 
 DATASETS = {
     "passage": [
@@ -40,11 +41,7 @@ def collect_data(
     nonrelevant_cos_sim_scores = []
 
     results_path = os.path.join(
-        RESULTS_FOLDER,
-        model_name,
-        document_length,
-        "10000",
-        "cos_sim_scores.pkl",
+        RESOURCES_FOLDER, "cos_sim_scores", model_name, f"{document_length}.pkl"
     )
 
     with open(results_path, "rb") as f:
@@ -118,66 +115,36 @@ def fit_gpd(excesses: np.ndarray, u: float, params_bulk) -> Tuple[float, float]:
     return xi, beta
 
 
-def alpha_skewnorm(params: tuple, tau: float) -> float:
-    """
-    Tail probability P[S >= tau] for S ~ SkewNormal(a, loc, scale).
-    """
-    a, loc, scale = params
-    assert scale > 0.0
-    return 1.0 - st.skewnorm.cdf(tau, a, loc=loc, scale=scale)
-
-
-def compute_recall_at_k(
-    k: int, params_r: tuple, params_n: tuple, R: int, N: int, fun_alpha, tol: float = 1e-10, max_iter: int = 100
-):
-    """
-    Numerically exact Recall@k by solving:
-        R * alpha_r(tau_k) + N * alpha_n(tau_k) = k
-    then Recall@k = alpha_r(tau_k).
-    """
-    assert k > 0 and R > 0 and N > 0
-
-    # Define g(tau) = expected count >= tau - k
-    def g(tau):
-        return R * alpha_skewnorm(params_r, tau) + N * fun_alpha(params_n, tau) - k
-
-    # Bracket where g(lo) >= 0 and g(hi) <= 0
-    lo = -0.7127793351188958
-    hi = 1.912777246955496
-    glo, ghi = g(lo), g(hi)
-
-    # If k is extreme, clamp
-    if (
-        glo <= 0
-    ):  # expected count at very low threshold already < k -> tau must be even lower
-        tau_k = lo
-        return alpha_skewnorm(params_r, tau_k)
-    if (
-        ghi >= 0
-    ):  # expected count at very high threshold already > k -> tau must be even higher
-        tau_k = hi
-        return alpha_skewnorm(params_r, tau_k)
-
-    # Robust bisection
-    for _ in range(max_iter):
-        mid = 0.5 * (lo + hi)
-        gm = g(mid)
-        if gm > 0:
-            lo = mid
-        else:
-            hi = mid
-        if abs(gm) <= tol:
-            break
-    tau_k = 0.5 * (lo + hi)
-    return alpha_skewnorm(params_r, tau_k)
-
-
 @click.command()
-@click.argument("model_name", type=str)
 @click.argument(
-    "document_length", type=click.Choice(["passage", "document"]), default="passage"
+    "model_name",
+    type=click.Choice(["all"] + list(MODEL_WRAPPERS.keys())),
+    default="all",
 )
-def line_chart(model_name: str, document_length: str):
+@click.argument(
+    "document_length",
+    type=click.Choice(["both", "passage", "document"]),
+    default="both",
+)
+def distribution(model_name: str, document_length: str):
+    """
+    Wrapper function to create line chart visualizing the score distributions.
+    """
+    model_names = list(MODEL_WRAPPERS.keys()) if model_name == "all" else [model_name]
+    document_lengths = (
+        ["passage", "document"] if document_length == "both" else [document_length]
+    )
+    for model_name in model_names:
+        for document_length in document_lengths:
+            try:
+                _distribution(model_name, document_length)
+            except Exception as e:
+                click.echo(f"Error processing {model_name}, {document_length}: {e}")
+
+    click.echo("Done")
+
+
+def _distribution(model_name: str, document_length: str):
     """
     Create line chart visualizing the score distributions.
     """
@@ -185,7 +152,7 @@ def line_chart(model_name: str, document_length: str):
     click.echo(f"Document Length: {document_length}")
 
     # Load max dim
-    _, max_dim = get_model_wrapper(model_name)
+    _, max_dim = MODEL_WRAPPERS[model_name]
 
     # Collect data from the model directory
     relevant_cos_sim_scores, nonrelevant_cos_sim_scores = collect_data(
@@ -275,7 +242,7 @@ def line_chart(model_name: str, document_length: str):
         plt.ylabel("Density", fontsize=14, labelpad=10)
         plt.xticks(fontsize=12)
         plt.yticks(fontsize=12)
-        plt.xlim([-0.25, 1])
+        plt.xlim([mu_n - 3 * std_n, 1.0])
         plt.hist(
             relevant_cos_sim_scores,
             bins=100,
@@ -323,5 +290,3 @@ def line_chart(model_name: str, document_length: str):
         os.makedirs(os.path.dirname(plot_path), exist_ok=True)
         plt.savefig(plot_path, dpi=300)
         plt.close()
-
-    click.echo("Done")

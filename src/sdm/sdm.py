@@ -1,7 +1,9 @@
 import click
 
+from sdm.cli.compute_empirical_results import compute_empirical_results
 from sdm.cli.compute_score_distributions import compute_score_distributions
-from sdm.cli.visualize.line_chart import line_chart
+from sdm.cli.visualize.distribution import distribution
+from sdm.cli.visualize.prediction import prediction
 
 
 @click.group()
@@ -23,9 +25,11 @@ def visualize():
 
 
 main.add_command(compute_score_distributions)
+main.add_command(compute_empirical_results)
 
 main.add_command(visualize)
-visualize.add_command(line_chart)
+visualize.add_command(distribution)
+visualize.add_command(prediction)
 
 
 if __name__ == "__main__":
