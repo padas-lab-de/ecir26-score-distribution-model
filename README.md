@@ -3,7 +3,7 @@
 [![Paper](https://img.shields.io/badge/Paper-ECIR%202026-blue)](TODO)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-This repository contains the source code and experiments for the paper **Modeling Score Distributions for Large-Scale Dense Information Retrieval**.
+This repository contains the source code and experiments for the paper **Predicting Recall@k for Large-Scale Dense Information Retrieval via Score Distribution Modeling**.
 
 ---
 
