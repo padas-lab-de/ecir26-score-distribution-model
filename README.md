@@ -128,8 +128,15 @@ sdm visualize distribution
 
 ### 3️⃣ Predict Recall@k for Larger Corpora
 
+In order to have a reference for the predicted results, we first compute the empirical results on the larger corpora.
+
 ```bash
 sdm compute-empirical-results
+```
+
+Then, we can visualize the empirical vs predicted Recall@k curves.
+
+```bash
 sdm visualize prediction
 ```
 
