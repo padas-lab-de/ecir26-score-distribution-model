@@ -14,6 +14,10 @@ This work introduces the **Score Distribution Model (SDM)** — a probabilistic 
 
 Using the **CoRE benchmark** (Controlled Retrieval Evaluation), we show that SDM can accurately forecast recall degradation when scaling from **10k to 100M documents**, providing a theoretical and practical tool for analyzing large-scale dense retrieval systems.
 
+<p align="center">
+  <img src="images/overview.png" width="60%">
+</p>
+
 ---
 
 ## 📘 Abstract
@@ -29,16 +33,31 @@ Using the **CoRE benchmark** (Controlled Retrieval Evaluation), we show that SDM
 
 The method models the **score distributions** between queries and documents as:
 
-* Relevant scores ( S_r \sim \text{SN}(\xi_r, \omega_r, \alpha_r) )
-* Non-relevant scores ( S_n ) as a **hybrid** of a skew-normal body and a **Generalized Pareto Distribution (GPD)** tail.
+- Relevant scores:  
+  $S_r \sim \text{SN}(\xi_r, \omega_r, \alpha_r)$
 
-The closed-form approximation for Recall@k is derived as:
+- Non-relevant scores:  
+  $S_n$ is modeled as a **hybrid** of a skew-normal body and a **Generalized Pareto Distribution (GPD)** tail.
 
-[
-\text{Recall@k} \approx 1 - F_r \left( F_n^{-1} \left( 1 - \frac{k}{N} \right) \right)
-]
+The Recall@k is computed by solving the following equation:
 
-where ( F_r ) and ( F_n ) denote the CDFs of the relevant and non-relevant score distributions, respectively.
+$$
+R \cdot \alpha_r(\tau_k) + N \cdot \alpha_n(\tau_k) = k
+$$
+
+with
+
+$$
+\alpha_r(\tau) = 1 - F_r(\tau) \qquad \text{and} \qquad \alpha_n(\tau) = 1 - F_n(\tau)
+$$
+
+where $F_r$ and $F_n$ denote the CDFs of the relevant and non-relevant score distributions, respectively.
+
+The cutoff score $\tau_k$ is the score of the k-th highest scoring document in the entire corpus. The Recall@k can then be computed as:
+
+$$
+\text{Recall@k} = 1 - F_r(\tau_k)
+$$
 
 ---
 
@@ -166,7 +185,7 @@ sdm visualize prediction
 Example output showing **empirical vs predicted Recall@k** curves for the CoRE passage collection:
 
 <p align="center">
-  <img src="images/recall.png" width="500">
+  <img src="images/recall.png" width="30%">
 </p>
 
 ---

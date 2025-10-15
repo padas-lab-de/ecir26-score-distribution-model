@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Tuple, Union
 import click
 import pytrec_eval
 import torch
+import traceback
 
 from sdm.cli.compute_score_distributions import _encode_corpus, _encode_queries
 from sdm.config import *
@@ -175,7 +176,7 @@ def _eval_results(
             results[dimensionality],
         )
         click.echo(
-            f"NDCG@10: {scores['ndcg_at_10']} [Dimensionality: {dimensionality}]"
+            f"NDCG@10: {scores['ndcg_at_10']} [Corpus size: {corpus_size:,}; Dimensionality: {dimensionality}]"
         )
         dim_dir = max_dim if dimensionality > max_dim else dimensionality
 
@@ -361,6 +362,7 @@ def compute_empirical_results(model_name: str, document_length: str):
                 )
             except Exception as e:
                 click.echo(f"Error processing {model_name}, {document_length}: {e}")
+                traceback.print_exc()
 
     click.echo("Done")
 
@@ -405,12 +407,11 @@ def _compute_empirical_results(
             corpus_results = results[corpus_size]
         else:
             for dim in results[corpus_size]:
-                for q in results[corpus_size][dim]:
-                    for qid in results[corpus_size][dim][q]:
-                        for cid in results[corpus_size][dim][q][qid]:
-                            corpus_results[dim][q][qid][cid] = results[corpus_size][
-                                dim
-                            ][q][qid][cid]
+                for qid in results[corpus_size][dim]:
+                    for cid in results[corpus_size][dim][qid]:
+                        corpus_results[dim][qid][cid] = results[corpus_size][
+                            dim
+                        ][qid][cid]
 
         save_path = os.path.join(RESULTS_FOLDER, model_name, document_length)
         _eval_results(
