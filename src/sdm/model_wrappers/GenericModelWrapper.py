@@ -13,7 +13,6 @@ from sdm.model_wrappers.utils import *
 
 
 class GenericModelWrapper(AbstractModelWrapper):
-
     def __init__(
         self,
         pretrained_model_name: str,

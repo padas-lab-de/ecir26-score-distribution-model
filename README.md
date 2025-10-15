@@ -146,6 +146,8 @@ sdm visualize prediction
 │       ├── distribution.py
 │       └── prediction.py
 ├── resources/                 # Output figures (e.g. Recall@k curves)
+├── images/                    # Example images for the README
+├── pyproject.toml
 ├── README.md
 └── LICENSE
 ```

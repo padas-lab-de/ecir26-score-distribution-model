@@ -241,7 +241,6 @@ def _prediction(model_name: str, document_length: str):
     _, axes = plt.subplots(2, 1, figsize=(4.5, 5.5), sharex=True)
 
     for ax, (document_length, corpus_sizes) in zip(axes, DATASETS.items()):
-
         # Collect data from the model directory
         data = collect_data(model_name, document_length, corpus_sizes)
 

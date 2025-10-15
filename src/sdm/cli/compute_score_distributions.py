@@ -230,9 +230,9 @@ def _compute_score_distributions(model_name: str, document_length: str):
 
                 for batch_index, docid in enumerate(batch_corpus_ids):
                     if docid in relevant_corpus_ids[qid]:
-                        relevant_cos_sim_scores[dimensionality][qid][docid] = (
-                            cos_sim_scores[batch_index].item()
-                        )
+                        relevant_cos_sim_scores[dimensionality][qid][
+                            docid
+                        ] = cos_sim_scores[batch_index].item()
                     elif docid not in distractor_corpus_ids[qid]:
                         nonrelevant_cos_sim_scores[dimensionality][qid].append(
                             cos_sim_scores[batch_index].item()

@@ -5,7 +5,6 @@ import torch
 
 
 class AbstractModelWrapper(ABC):
-
     @abstractmethod
     def encode_queries(self, queries: List[str], *args, **kwargs) -> torch.Tensor:
         """

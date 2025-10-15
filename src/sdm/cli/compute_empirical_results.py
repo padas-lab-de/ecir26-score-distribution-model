@@ -1,13 +1,13 @@
+import heapq
 import json
 import os
 import time
 from collections import defaultdict
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Tuple, Union
 
 import click
 import pytrec_eval
 import torch
-import heapq
 
 from sdm.cli.compute_score_distributions import _encode_corpus, _encode_queries
 from sdm.config import *
@@ -61,12 +61,10 @@ def _evaluate_results(
     qrels: Dict[str, Dict[str, int]],
     results: Dict[str, Dict[str, float]],
     k_values: List[int],
-) -> Tuple[
-    Dict[str, float],
-    Dict[str, float],
-    Dict[str, float],
-    Dict[str, float],
-]:
+) -> Tuple[Dict[str, float], Dict[str, float], Dict[str, float], Dict[str, float],]:
+    """
+    Evaluates the results using pytrec_eval and computes NDCG, MAP, Recall and Precision at different k values.
+    """
     all_ndcgs, all_aps, all_recalls, all_precisions = {}, {}, {}, {}
 
     for k in k_values:
@@ -155,14 +153,13 @@ def _eval_results(
     max_dim: int,
 ):
     """
-    Evaluates dense retrieval performance across different embedding vector lengths and compression methods. The results
-    are then stored in a directory structure under the specified save directory split by embedding dimensionality and
-    quantization method.
+    Evaluates dense retrieval performance across different embedding vector lengths. The results
+    are saved in a JSON file.
 
     Args:
         dimensionalities: The different embedding vector lengths.
         k_values: A list of k values for which metrics should be computed.
-        corpus_size: The corpus size (relevant when using CoRE, defaults to the dataset name for BEIR).
+        corpus_size: The corpus size.
         save_path: The directory to save the results.
         qrels_relevant_only: The qrels containing only relevant documents.
         qrels: The qrels that also contain information on distractors.
@@ -177,7 +174,9 @@ def _eval_results(
             qrels,
             results[dimensionality],
         )
-        click.echo(f"NDCG@10: {scores['ndcg_at_10']}")
+        click.echo(
+            f"NDCG@10: {scores['ndcg_at_10']} [Dimensionality: {dimensionality}]"
+        )
         dim_dir = max_dim if dimensionality > max_dim else dimensionality
 
         # Save the results
@@ -189,18 +188,6 @@ def _eval_results(
         os.makedirs(os.path.dirname(results_path), exist_ok=True)
         with open(results_path, "w") as f:
             json.dump(scores, f, indent=4)
-
-
-def _get_top_k(scores: torch.Tensor, k: int):
-    return torch.topk(
-        scores.cuda(),
-        min(
-            k + 1,
-            (len(scores[1]) if len(scores) > 1 else len(scores[-1])),
-        ),
-        dim=1,
-        largest=True,
-    )
 
 
 def _search(
@@ -222,11 +209,11 @@ def _search(
     result_heaps = {}
     dimensionalities = sorted(dimensionalities, reverse=True)
     for dimensionality in dimensionalities:
+        # Initialize one heaps dict for all corpus sizes
+        result_heaps[dimensionality] = {qid: [] for qid in query_ids}
+
         for corpus_size in corpus_sizes:
             results[corpus_size][dimensionality] = {qid: {} for qid in query_ids}
-
-            # Initialize one heaps dict for all corpus sizes
-            result_heaps[dimensionality] = None
 
     # Embed queries or load saved embeddings:
     queries_save_path = os.path.join(save_path, "queries.pt")
@@ -280,13 +267,16 @@ def _search(
                 query_embeds = query_embeddings[:, :dimensionality]
 
                 # Compute cosine similarity
-                similarity_scores = cos_sim(corpus_embeds, query_embeds).detach().cpu()
+                similarity_scores = cos_sim(query_embeds, corpus_embeds).detach().cpu()
 
                 # Check for NaN values
                 assert torch.isnan(similarity_scores).sum() == 0
 
                 # Get top-k values
-                similarity_scores_top_k_values, similarity_scores_top_k_idx = torch.topk(
+                (
+                    similarity_scores_top_k_values,
+                    similarity_scores_top_k_idx,
+                ) = torch.topk(
                     similarity_scores,
                     min(
                         top_k + 1,
@@ -305,17 +295,25 @@ def _search(
 
                 for query_itr in range(len(query_embeddings)):
                     query_id = query_ids[query_itr]
+
                     for sub_corpus_id, score in zip(
                         similarity_scores_top_k_idx[query_itr],
                         similarity_scores_top_k_values[query_itr],
                     ):
                         corpus_id = corpus_ids[corpus_start_idx + sub_corpus_id]
+
                         if len(result_heaps[dimensionality][query_id]) < top_k:
                             # Push item on the heap
-                            heapq.heappush(result_heaps[dimensionality][query_id], (score, corpus_id))
+                            heapq.heappush(
+                                result_heaps[dimensionality][query_id],
+                                (score, corpus_id),
+                            )
                         else:
                             # If item is larger than the smallest in the heap, push it on the heap then pop the smallest element
-                            heapq.heappushpop(result_heaps[dimensionality][query_id], (score, corpus_id))
+                            heapq.heappushpop(
+                                result_heaps[dimensionality][query_id],
+                                (score, corpus_id),
+                            )
 
         # Clear CUDA cache
         torch.cuda.empty_cache()
@@ -324,7 +322,7 @@ def _search(
         for dimensionality in dimensionalities:
             for qid in result_heaps[dimensionality]:
                 for score, cid in result_heaps[dimensionality][qid]:
-                    results[corpus_size][dimensionality][qid][cid] = score.item()
+                    results[corpus_size][dimensionality][qid][cid] = score
 
     torch.cuda.empty_cache()
     return results
@@ -349,17 +347,27 @@ def compute_empirical_results(model_name: str, document_length: str):
     document_lengths = (
         ["passage", "document"] if document_length == "both" else [document_length]
     )
-    for model_name in model_names:
-        for document_length in document_lengths:
+
+    for document_length in document_lengths:
+        corpora, queries, qrels, qrels_relevant_only = load_data(document_length)
+        click.echo(f"Loaded {len(queries)} queries and {len(corpora)} corpora")
+
+        for model_name in model_names:
             try:
-                _compute_empirical_results(model_name, document_length)
+                _compute_empirical_results(
+                    model_name,
+                    document_length,
+                    data=(corpora, queries, qrels, qrels_relevant_only),
+                )
             except Exception as e:
                 click.echo(f"Error processing {model_name}, {document_length}: {e}")
 
     click.echo("Done")
 
 
-def _compute_empirical_results(model_name: str, document_length: str):
+def _compute_empirical_results(
+    model_name: str, document_length: str, data: Tuple[dict, dict, dict, dict]
+):
     """
     Compute empirical results for the given model and document length.
     """
@@ -369,8 +377,8 @@ def _compute_empirical_results(model_name: str, document_length: str):
 
     model, max_dim = get_model_wrapper(model_name)
 
-    corpora, queries, qrels, qrels_relevant_only = load_data(document_length)
-    click.echo(f"Loaded {len(queries)} queries and {len(corpora)} corpora")
+    # Loaded data
+    corpora, queries, qrels, qrels_relevant_only = data
 
     # Initialize save path
     save_path = os.path.join(EMBEDDINGS_FOLDER, model_name, document_length)
