@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import scipy.stats as st
 from scipy.optimize import minimize_scalar
+import traceback
 
 from sdm.config import *
 from sdm.model_wrappers import MODEL_WRAPPERS
@@ -140,6 +141,7 @@ def distribution(model_name: str, document_length: str):
                 _distribution(model_name, document_length)
             except Exception as e:
                 click.echo(f"Error processing {model_name}, {document_length}: {e}")
+                traceback.print_exc()
 
     click.echo("Done")
 

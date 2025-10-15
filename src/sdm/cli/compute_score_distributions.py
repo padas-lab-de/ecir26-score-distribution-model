@@ -1,10 +1,11 @@
 import os
 import pickle
 from collections import defaultdict
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import click
 import torch
+import traceback
 from tqdm import tqdm
 
 from sdm.config import *
@@ -112,19 +113,24 @@ def compute_score_distributions(model_name: str, document_length: str):
     document_lengths = (
         ["passage", "document"] if document_length == "both" else [document_length]
     )
-    for model_name in model_names:
-        for document_length in document_lengths:
+    
+    for document_length in document_lengths:
+        corpora, queries, qrels, qrels_relevant_only = load_data(document_length)
+        click.echo(f"Loaded {len(queries)} queries and {len(corpora)} corpora")
+
+        for model_name in model_names:
             try:
-                _compute_score_distributions(model_name, document_length)
+                _compute_score_distributions(model_name, document_length, data=(corpora, queries, qrels, qrels_relevant_only))
             except Exception as e:
                 click.echo(
                     f"Error computing score distributions for {model_name}, {document_length}: {e}"
                 )
+                traceback.print_exc()
 
     click.echo("Done")
 
 
-def _compute_score_distributions(model_name: str, document_length: str):
+def _compute_score_distributions(model_name: str, document_length: str, data: Tuple[dict, dict, dict, dict]):
     """
     Compute score distributions for the given model and document length.
     """
@@ -139,8 +145,7 @@ def _compute_score_distributions(model_name: str, document_length: str):
     model, max_dim = get_model_wrapper(model_name)
     click.echo(f"Loaded model: {model_name} with max dim {max_dim}")
 
-    corpora, queries, qrels = load_data(document_length)
-    click.echo(f"Loaded {len(queries)} queries and {len(corpora)} corpora")
+    corpora, queries, qrels, _ = data
 
     # Initialize results dict
     dimensionalities = [
