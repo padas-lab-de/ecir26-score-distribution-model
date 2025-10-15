@@ -182,7 +182,7 @@ sdm visualize prediction
 
 ## 📈 Example Visualization
 
-Example output showing **empirical vs predicted Recall@k** curves for the CoRE passage collection:
+Example output showing **empirical vs predicted Recall@k** curves for the CoRE passage collection (Dense retriever: [Snowflake Arctic M v2](https://huggingface.co/Snowflake/snowflake-arctic-embed-m-v2.0)):
 
 <p align="center">
   <img src="images/recall.png" width="30%">
